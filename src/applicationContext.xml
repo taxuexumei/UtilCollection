@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+xmlns="http://www.springframework.org/schema/beans" xmlns:context="http://www.springframework.org/schema/context" 
+xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx" 
+xsi:schemaLocation="http://www.springframework.org/schema/beans 
+http://www.springframework.org/schema/beans/spring-beans-4.2.xsd 
+http://www.springframework.org/schema/context 
+http://www.springframework.org/schema/context/spring-context-4.2.xsd 
+http://www.springframework.org/schema/aop 
+http://www.springframework.org/schema/aop/spring-aop-4.2.xsd 
+http://www.springframework.org/schema/tx 
+http://www.springframework.org/schema/tx/spring-tx-4.2.xsd">
+
+<!-- 指定spring读取db.properties配置 -->
+<context:property-placeholder location="classpath:db.properties"/>
+
+
+	<!-- 使用Annotation自动注册Bean，解决事物失效问题：在主容器中不扫描@Controller注解，在SpringMvc中只扫描@Controller注解。  -->
+	<!-- 他会默认扫描com.zhiyou100.crm包下及其子包的所有 有@Controller @Service @Repository @resourse
+	这些注解的类，会把这些对象实例化之后放入容器中.
+	
+	 -->
+	<context:component-scan base-package="com.zhiyou100.crm"><!-- base-package 如果多个，用“,”分隔 -->
+		<!-- 告诉主容器不要扫描加有@Controller 这些类，这些bean 是由web容器进行管理的  -->
+		<context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+	</context:component-scan>
+	<!-- 1.将连接池
+      c3p0 dbcp druid
+      http://blog.csdn.net/caihaijiang/article/details/6843496
+      http://blog.csdn.net/u010003835/article/details/51417644  注入复杂对象   -->
+ 	<!-- dataSourse 数据资源配置 -->
+	<bean name="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource" >
+	<!-- 配置基本的url，user，password -->
+		<property name="jdbcUrl" value="${jdbc.jdbcUrl}" ></property>
+		<property name="driverClass" value="${jdbc.driverClass}" ></property>
+		<property name="user" value="${jdbc.user}" ></property>
+		<property name="password" value="${jdbc.password}" ></property>
+	</bean>
+
+
+ <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+</bean>
+	<!--  
+	事物第一种方式第一步
+	<tx:advice id="txAdvice" transaction-manager="transactionManager" >
+	<tx:attributes>
+		 以方法为单位,指定方法应用什么事务属性
+			isolation:隔离级别
+			事务隔离级别
+
+                              隔离级别是指若干个并发的事务之间的隔离程度。TransactionDefinition 接口中定义了五个表示隔离级别的常量：
+
+            TransactionDefinition.ISOLATION_DEFAULT：这是默认值，表示使用底层数据库的默认隔离级别。对大部分数据库而言，通常这值就是TransactionDefinition.ISOLATION_READ_COMMITTED。
+            TransactionDefinition.ISOLATION_READ_UNCOMMITTED：该隔离级别表示一个事务可以读取另一个事务修改但还没有提交的数据。该级别不能防止脏读，不可重复读和幻读，因此很少使用该隔离级别。比如PostgreSQL实际上并没有此级别。
+            TransactionDefinition.ISOLATION_READ_COMMITTED：该隔离级别表示一个事务只能读取另一个事务已经提交的数据。该级别可以防止脏读，这也是大多数情况下的推荐值。
+            TransactionDefinition.ISOLATION_REPEATABLE_READ：该隔离级别表示一个事务在整个过程中可以多次重复执行某个查询，并且每次返回的记录都相同。该级别可以防止脏读和不可重复读。
+            TransactionDefinition.ISOLATION_SERIALIZABLE：所有的事务依次逐个执行，这样事务之间就完全不可能产生干扰，也就是说，该级别可以防止脏读、不可重复读以及幻读。但是这将严重影响程序的性能。通常情况下也不会用到该级别。
+			
+			propagation:传播行为
+			     所谓事务的传播行为是指，如果在开始当前事务之前，一个事务上下文已经存在，此时有若干选项可以指定一个事务性方法的执行行为。在TransactionDefinition定义中包括了如下几个表示传播行为的常量：
+
+             TransactionDefinition.PROPAGATION_REQUIRED：如果当前存在事务，则加入该事务；如果当前没有事务，则创建一个新的事务。这是默认值。
+             TransactionDefinition.PROPAGATION_REQUIRES_NEW：创建一个新的事务，如果当前存在事务，则把当前事务挂起。
+             TransactionDefinition.PROPAGATION_SUPPORTS：如果当前存在事务，则加入该事务；如果当前没有事务，则以非事务的方式继续运行。
+             TransactionDefinition.PROPAGATION_NOT_SUPPORTED：以非事务方式运行，如果当前存在事务，则把当前事务挂起。
+             TransactionDefinition.PROPAGATION_NEVER：以非事务方式运行，如果当前存在事务，则抛出异常。
+             TransactionDefinition.PROPAGATION_MANDATORY：如果当前存在事务，则加入该事务；如果当前没有事务，则抛出异常。
+             TransactionDefinition.PROPAGATION_NESTED：如果当前存在事务，则创建一个事务作为当前事务的嵌套事务来运行；如果当前没有事务，则该取值等价于TransactionDefinition.PROPAGATION_REQUIRED。
+	
+			read-only:是否只读
+			只读事务用于客户代码只读但不修改数据的情形，只读事务用于特定情景下的优化，比如使用Hibernate的时候。
+                               默认为读写事务。
+                               
+		<tx:method name="save*" isolation="REPEATABLE_READ" propagation="REQUIRED" read-only="false" />
+		<tx:method name="persist*" isolation="REPEATABLE_READ" propagation="REQUIRED" read-only="false" />
+		<tx:method name="update*" isolation="REPEATABLE_READ" propagation="REQUIRED" read-only="false" />
+		<tx:method name="modify*" isolation="REPEATABLE_READ" propagation="REQUIRED" read-only="false" />
+		<tx:method name="delete*" isolation="REPEATABLE_READ" propagation="REQUIRED" read-only="false" />
+		<tx:method name="remove*" isolation="REPEATABLE_READ" propagation="REQUIRED" read-only="false" />
+		<tx:method name="get*" isolation="REPEATABLE_READ" propagation="REQUIRED" read-only="true" />
+		<tx:method name="find*" isolation="REPEATABLE_READ" propagation="REQUIRED" read-only="true" />
+		<tx:method name="transferMoney" isolation="REPEATABLE_READ" propagation="REQUIRED" read-only="false" />
+	
+	</tx:attributes>
+</tx:advice>
+
+-->
+	<!-- 	 配置 Annotation 驱动，扫描@Transactional注解的类定义事务  -->
+		<!-- 启用对事物注解的支持 -->
+		<tx:annotation-driven transaction-manager="transactionManager" proxy-target-class="true"/>
+	 
+ 
+<bean id="myAspectXml" class="com.zhiyou100.crm.aspect.MyAspect1"></bean>
+
+
+
+<aop:config>
+<!-- =================================================================================== -->
+<!-- 配置切点表达式
+	execution(表達式)
+	[方法訪問修飾符] 方法返回值 包名.類名.方法名(方法的參數)
+	例子：
+	<aop:pointcut expression="execution(* com.zhiyou100.crm.service..*(..))" id="txPc"/>
+	 -->
+<!-- =================================================================================== -->
+<!--  
+事物第一种方式第二步
+<aop:pointcut expression="execution(* com.zhiyou100.crm.service..*(..))" id="txPc"/>
+<aop:advisor advice-ref="txAdvice" pointcut-ref="txPc" />	-->
+<!-- =================================================================================== -->
+<!-- 配置切面 : 通知+切点  
+	advice-ref:通知的名称   
+	pointcut-ref:切点的名称
+	例子：
+	<aop:advisor advice-ref="txAdvice" pointcut-ref="txPc" />
+	-->
+<!-- =================================================================================== -->
+	<aop:aspect ref="myAspectXml"><!-- 定义切面 -->
+
+<!-- =================================================================================== -->	
+
+<!-- 配置切点
+	   配置切点表达式
+	execution(表達式)
+	[方法訪問修飾符] 方法返回值 包名.類名.方法名(方法的參數)
+	http://jinnianshilongnian.iteye.com/blog/1415606
+	配置切点
+	   -->
+
+<!-- =================================================================================== -->
+	   
+		  <aop:pointcut expression="execution(* com.zhiyou100.crm.dao..*(..))" id="daoPC"/>
+	
+<!--   
+	  前置通知[Before advice]：在连接点前面执行，前置通知不会影响连接点的执行，除非此处抛出异常。 
+           正常返回通知[After returning advice]：在连接点正常执行完成后执行，如果连接点抛出异常，则不会执行。 
+           异常返回通知[After throwing advice]：在连接点抛出异常后执行。 
+           返回通知[After (finally) advice]：在连接点执行完成后执行，不管是正常执行完成，还是抛出异常，都会执行返回通知中的内容。 
+           环绕通知[Around advice]：环绕通知围绕在连接点前后，比如一个方法调用的前后。这是最强大的通知类型，能在方法调用前后自定义一些操作。环绕通知还需要负责决定是继续处理join point(调用ProceedingJoinPoint的proceed方法)还是中断执行。 
+	 -->
+	 
+<!-- =================================================================================== -->
+
+	    <aop:before method="before" pointcut-ref="daoPC" />
+	    <aop:after method="after" pointcut-ref="daoPC" />
+	    <aop:after-throwing method="afterThrowing" pointcut-ref="daoPC" />
+	    <aop:after-returning method="afterReturn" pointcut-ref="daoPC" />
+	    <aop:around method="around" pointcut-ref="daoPC" />
+	</aop:aspect>
+	
+</aop:config>
+
+
+
+<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+   <constructor-arg ref="dataSource" />
+</bean>
+
+</beans>

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context" xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+	http://www.springframework.org/schema/beans/spring-beans-4.2.xsd 
+	http://www.springframework.org/schema/context 
+	http://www.springframework.org/schema/context/spring-context-4.2.xsd http://www.springframework.org/schema/mvc 
+	http://www.springframework.org/schema/mvc/spring-mvc-4.2.xsd">
+    
+    <description>Spring MVC Configuration</description>
+    
+	<!-- 使用Annotation自动注册Bean,只扫描@Controller 
+	use-default-filters="true"
+	 默认扫描指定包下的全部 @Component(@Controller/@Service/@Repository), 
+	 exclude-filter 指定的不扫描，
+	 include-filter指定的扫描， 
+	 include-filter和exclude-filter 
+	 没有指定的仍然扫描，假設一個service被掃描兩次，有可能導致事物失效
+	 use-default-filters="false"
+	 include-filter指定的扫描 ,其他沒有指定的不扫描
+	-->
+	<context:component-scan 
+	base-package="com.zhiyou100.crm.controller" 
+	use-default-filters="false">	<!-- base-package 如果多个，用“,”分隔 -->
+		<context:include-filter 
+		type="annotation" 
+		expression="org.springframework.stereotype.Controller"/>
+	</context:component-scan>
+	
+	
+	
+
+<!-- 配置校验器 -->	
+	<bean id="validator" class="org.springframework.validation.beanvalidation.LocalValidatorFactoryBean">
+		<property name="providerClass" value="org.hibernate.validator.HibernateValidator"/><!-- hibernatejar包提供的校验器 -->
+		<!-- 指定校验所使用的资源，在文中配置错误校验信息 。如果没有指定，那么默认是使用 classpath下面的ValidationMessage.properties-->
+		<property name="validationMessageSource" ref="messageSource"/>
+	</bean>
+<!-- 配置需要使用的错误的校验信息：需要新建一个properties文件 -->
+<bean id="messageSource" class="org.springframework.context.support.ReloadableResourceBundleMessageSource">
+		<!-- 需要再这里配置三样东西  资源文件名(name)包含(资源文件路径)  编码格式   资源文件在内存中的缓存时间-->
+		<property name="basenames">
+			<list>
+				<value>classpath:CustomValidationMessage</value>
+			</list>
+		</property>
+		<property name="fileEncodings" value="utf-8"/>
+		<property name="cacheSeconds" value="120"/>
+</bean>	
+
+	
+	
+	<!-- 启动Spring MVC的注解功能，完成请求和注解POJO的映射,解决@ResponseBody乱码问题, 需要在annotation-driven和component-scan之前,否则乱码问题同样无法解决 -->  
+	<bean class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter">  
+	    <property name="messageConverters">  
+	        <list>  
+	            <bean class="org.springframework.http.converter.json.MappingJackson2HttpMessageConverter">
+	            	<property name="supportedMediaTypes">  
+	                    <list>  
+	                        <value>text/html;charset=UTF-8</value>  
+	                        <value>text/json;charset=UTF-8</value>  
+                			<value>application/json;charset=UTF-8</value>  
+	                    </list>  
+	                </property>  
+	            </bean> 
+	             <bean class="org.springframework.http.converter.StringHttpMessageConverter">  
+	                <property name="supportedMediaTypes">  
+	                    <list>  
+	                        <value>text/html;charset=UTF-8</value>  
+	                    </list>  
+	                </property>  
+	            </bean>  
+	        </list>  
+	    </property>  
+	</bean>
+	
+	
+	
+	<!-- 註解驅動  
+	  會加載
+	  1 RequestMappingHandlerMapping
+	  2 BeanNameUrlHandlerMapping
+	  3 RequestMappingHandlerAdapter
+      4 HttpRequestHandlerAdapter
+      5 SimpleControllerHandlerAdapter
+      6 ExceptionHandlerExceptionResolver
+      7 ResponseStatusExceptionResolver
+      8 DefaultHandlerExceptionResolver
+      1 2: 是HandlerMapping接口的实现类，用来处理请求映射的。其中第一个是处理处理请求映射的，处理@RequestMapping跟请求地址之间的关系
+                 
+      3 4 5:是用来处理请求的。具体点说就是确定调用哪个controller的哪个方法来处理当前请求。第一个处理@Controller注解的处理器，支持自定义方法参数和返回值）
+            RequestMappingHandlerAdapter是请求处理的适配器，也就是请求之后处理具体逻辑的执行，关系到哪个类的哪个方法以及转换器等工作。
+                              第二个是处理继承HttpRequestHandler的处理器。
+                              第三个处理继承自Controller接口的处理器
+      6 7 8:是用来处理异常的解析器。
+	-->
+	
+	<!-- 添加<mvc:annotation-driven/> 的原因：  http://blog.csdn.net/jbgtwang/article/details/7359592 -->
+	<mvc:annotation-driven validator="validator"/>
+    <!--  检查员，对进入DispatcherServlet的URL进行筛查，如果发现是静态资源的请求，就将该请求转由Web应用服务器默认的Servlet处理，
+       如果不是静态资源的请求，才由DispatcherServlet继续处理，這是静态资源不攔截的一種方式
+        還有其他方式，比如我們可以把DispatcherServlet 的攔截路徑設置為*.do 而不是/
+        
+        當然，如果你不想設置為.do 的形式(优雅REST风格的资源URL不希望带 .html 或 .do 等后缀,带后缀的URL，而无法采用真正的REST风格的URL)
+   你也有另一種方式去處理静态资源不攔截
+   <mvc:resources location="/,classpath:/META-INF/publicResources/" mapping="/resources/**"/>
+       以上配置将Web根路径"/"及类路径下 /META-INF/publicResources/ 的目录映射为/resources路径。假设Web根路径下拥有images、js这两个资源目录,在images下面有bg.gif图片，在js下面有test.js文件，则可以通过 /resources/images/bg.gif 和 /resources/js/test.js 访问这二个静态资源。
+
+     假设WebRoot还拥有images/bg1.gif 及 js/test1.js，则也可以在网页中通过 /resources/images/bg1.gif 及 /resources/js/test1.js 进行引用
+          
+       -->
+    
+<mvc:default-servlet-handler/>
+	   <!-- 对模型视图名称的解析，在请求时模型视图名称添加前后缀 -->
+    <bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+        <property name="prefix" value="/WEB-INF/view/"/>
+        <property name="suffix" value=".jsp"/>
+        <property name="viewClass" value="org.springframework.web.servlet.view.JstlView"/>
+    </bean>
+	
+</beans>

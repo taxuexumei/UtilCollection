@@ -1,0 +1,12 @@
+﻿项目技术：
+1.Nginx+vsftp构建图片存储服务器
+2.业务逻辑的开发，在公司中。把项目的查询的东西封装在redis的缓存中的过程。使用的封装的jedisClient
+来对数据进行防止，当然前提是配置了redis的xml集群文件。（文件里面配置了什么。。。）
+项目难点：
+1.在MyBatis中执行分页操作的时候，使用pagehelper分页插件，只有在mysql5.7以上才支持。
+<dependency>
+            <groupId>com.github.pagehelper</groupId>
+            <artifactId>pagehelper</artifactId>
+            <version>3.4.2-fix</version>
+</dependency>
+2.
